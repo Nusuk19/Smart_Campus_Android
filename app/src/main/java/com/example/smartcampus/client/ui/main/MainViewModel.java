@@ -17,24 +17,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * ViewModel для MainActivity
+ * 🔄 ОНОВЛЕНО: ViewModel для MainActivity
  *
- * ОРИГІНАЛЬНА ЛОГІКА:
- * - Повертає хардкоджені дані (Room 101, 102, 103)
- * - Не підключений до Repository
- * - Не отримує реальні дані з API/БД
- *
- * ПОКРАЩЕННЯ:
- * ✅ Підключено RoomRepository
- * ✅ Реальні дані з API/БД
- * ✅ Маппінг RoomEntity → Room (UI model)
- * ✅ Фільтрація (доступні/зайняті)
- * ✅ Пошук
- * ✅ Обробка станів (loading/error/success)
- *
- * ВИКОРИСТАННЯ:
- * MainViewModel vm = new ViewModelProvider(this).get(MainViewModel.class);
- * vm.getRooms().observe(this, rooms -> adapter.setRooms(rooms));
+ * ЗМІНИ:
+ * - Використовує RoomRepository замість хардкоджених даних
+ * - Додано обробку помилок
+ * - Додано фільтрацію та пошук
  */
 public class MainViewModel extends AndroidViewModel {
 
@@ -54,14 +42,7 @@ public class MainViewModel extends AndroidViewModel {
         super(application);
         repository = new RoomRepository(application);
 
-        // ОРИГІНАЛЬНА ЛОГІКА (закоментована):
-        // rooms.setValue(Arrays.asList(
-        //     new Room("Room 101"),
-        //     new Room("Room 102"),
-        //     new Room("Room 103")
-        // ));
-
-        // НОВА ЛОГІКА: Реальні дані з Repository
+        // Завантажити дані з Repository
         LiveData<List<RoomEntity>> roomEntities = repository.getRooms();
 
         // Маппінг RoomEntity → Room (UI model)
@@ -70,10 +51,6 @@ public class MainViewModel extends AndroidViewModel {
 
     /**
      * Отримати список аудиторій
-     * ВИКОРИСТАННЯ В ACTIVITY:
-     * viewModel.getRooms().observe(this, rooms -> {
-     *     adapter.setRooms(rooms);
-     * });
      */
     public LiveData<List<Room>> getRooms() {
         return rooms;
@@ -89,8 +66,6 @@ public class MainViewModel extends AndroidViewModel {
 
     /**
      * Пошук аудиторій
-     * ВИКОРИСТАННЯ:
-     * viewModel.searchRooms("305");
      */
     public LiveData<List<Room>> searchRooms(String query) {
         LiveData<List<RoomEntity>> searchResults = repository.searchRooms(query);
@@ -103,6 +78,7 @@ public class MainViewModel extends AndroidViewModel {
     public void refresh() {
         isLoading.setValue(true);
         repository.forceRefresh();
+
         // Через 2 секунди прибрати індикатор завантаження
         new android.os.Handler().postDelayed(() -> isLoading.setValue(false), 2000);
     }
@@ -140,12 +116,11 @@ public class MainViewModel extends AndroidViewModel {
 
     /**
      * Конвертувати RoomEntity (БД) → Room (UI)
-     * ЧОМУ ПОТРІБНО:
-     * - RoomEntity містить технічні поля (timestamps, ID)
-     * - Room - спрощена модель для UI (тільки name, status)
      */
     private List<Room> mapToUiModel(List<RoomEntity> entities) {
-        if (entities == null) return new ArrayList<>();
+        if (entities == null) {
+            return new ArrayList<>();
+        }
 
         return entities.stream()
                 .map(entity -> new Room(

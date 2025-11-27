@@ -19,16 +19,20 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.smartcampus.client.R;
+import com.example.smartcampus.client.ui.auth.LoginActivity;
 import com.example.smartcampus.client.ui.main.adapter.RoomAdapter;
 import com.example.smartcampus.client.ui.nfc.NFCActivity;
+import com.example.smartcampus.client.ui.profile.ProfileActivity;
+import com.example.smartcampus.client.ui.tags.MyTagsActivity;
+import com.example.smartcampus.client.utils.SessionManager;
 
 /**
- * Головний екран зі списком аудиторій
+ * 🔄 ОНОВЛЕНО: Головний екран зі списком аудиторій
  *
- * ВИПРАВЛЕННЯ:
- * ✅ Додано Toolbar для меню
- * ✅ Додано кнопку "NFC Scanner" знизу екрану
- * ✅ Детальне логування
+ * ЗМІНИ:
+ * - Додано перевірку авторизації
+ * - Додано меню з Profile, My Tags
+ * - Покращено обробку помилок
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -36,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
 
     private MainViewModel vm;
     private RoomAdapter adapter;
+    private SessionManager sessionManager;
 
     // Views
     private RecyclerView recyclerView;
@@ -48,9 +53,18 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Перевірка авторизації
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            Log.d(TAG, "User not logged in, redirecting to LoginActivity");
+            goToLoginActivity();
+            return;
+        }
+
         setContentView(R.layout.activity_main);
 
-        Log.d(TAG, "✅ onCreate started");
+        Log.d(TAG, "✅ onCreate started - User: " + sessionManager.getUserEmail());
 
         try {
             setupToolbar();
@@ -69,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * ✅ ДОДАНО: Налаштування Toolbar
+     * Налаштування Toolbar з меню
      */
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -181,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * ✅ ДОДАНО: Кнопка NFC знизу екрану
+     * Кнопка NFC знизу екрану
      */
     private void setupNfcButton() {
         if (nfcButton != null) {
@@ -193,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * ✅ Відкрити NFC сканер
+     * Відкрити NFC сканер
      */
     private void openNfcScanner() {
         Log.d(TAG, "🔍 Opening NFC Scanner...");
@@ -267,9 +281,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        menu.add(0, 1, 0, "🔍 NFC Сканер");
-        menu.add(0, 2, 0, "🔄 Оновити");
-        menu.add(0, 3, 0, "ℹ️ Про додаток");
+        // Або програмно:
+        menu.add(0, 1, 0, "👤 Профіль");
+        menu.add(0, 2, 0, "🏷️ Мої теги");
+        menu.add(0, 3, 0, "🔍 NFC Сканер");
+        menu.add(0, 4, 0, "🔄 Оновити");
+        menu.add(0, 5, 0, "🚪 Вийти");
+
         Log.d(TAG, "✅ Menu created");
         return true;
     }
@@ -277,28 +295,69 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case 1: // NFC сканер
+            case 1: // Профіль
+                openProfile();
+                return true;
+
+            case 2: // Мої теги
+                openMyTags();
+                return true;
+
+            case 3: // NFC сканер
                 openNfcScanner();
                 return true;
 
-            case 2: // Оновити
+            case 4: // Оновити
                 Log.d(TAG, "🔄 Menu refresh");
                 vm.refresh();
                 return true;
 
-            case 3: // Про додаток
-                showAboutDialog();
+            case 5: // Вийти
+                logout();
                 return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-    private void showAboutDialog() {
+    /**
+     * Відкрити профіль
+     */
+    private void openProfile() {
+        Intent intent = new Intent(this, ProfileActivity.class);
+        startActivity(intent);
+    }
+
+    /**
+     * Відкрити мої теги
+     */
+    private void openMyTags() {
+        Intent intent = new Intent(this, MyTagsActivity.class);
+        startActivity(intent);
+    }
+
+    /**
+     * Вийти з акаунту
+     */
+    private void logout() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Smart Campus")
-                .setMessage("Система управління аудиторіями\n\nВерсія: 1.0")
-                .setPositiveButton("OK", null)
+                .setTitle("Вийти з акаунту?")
+                .setMessage("Ви впевнені?")
+                .setPositiveButton("Вийти", (dialog, which) -> {
+                    sessionManager.clearSession();
+                    goToLoginActivity();
+                })
+                .setNegativeButton("Скасувати", null)
                 .show();
+    }
+
+    /**
+     * Перейти до LoginActivity
+     */
+    private void goToLoginActivity() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     // ========== LIFECYCLE ==========
@@ -307,6 +366,11 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "▶️ onResume");
+
+        // Перевірити чи користувач все ще залогінений
+        if (!sessionManager.isLoggedIn()) {
+            goToLoginActivity();
+        }
     }
 
     @Override

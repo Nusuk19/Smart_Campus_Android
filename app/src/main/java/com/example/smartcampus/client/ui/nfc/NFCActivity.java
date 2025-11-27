@@ -8,29 +8,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.lifecycle.ViewModelProvider;
 import com.example.smartcampus.client.R;
-import com.example.smartcampus.client.data.remote.RetrofitClient;
-
-import org.json.JSONObject;
-
-import okhttp3.ResponseBody;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-import retrofit2.http.POST;
-import retrofit2.http.Path;
+import com.example.smartcampus.client.utils.SessionManager;
 
 /**
- * NFCActivity з РЕАЛЬНОЮ інтеграцією API
- *
- * ВИПРАВЛЕННЯ:
- * ✅ Відправляє POST /api/rooms/open/{nfcTagId} на сервер
- * ✅ Оновлює статус аудиторії в БД
- * ✅ MainActivity автоматично бачить зміни через LiveData
+ * 🔄 ВИПРАВЛЕНО: NFCActivity з ViewModel
  */
 public class NFCActivity extends AppCompatActivity {
 
@@ -39,12 +24,8 @@ public class NFCActivity extends AppCompatActivity {
     private NfcAdapter nfcAdapter;
     private PendingIntent pendingIntent;
     private TextView statusText;
-
-    // API інтерфейс для NFC
-    interface NfcApi {
-        @POST("rooms/open/{nfcTagId}")
-        Call<ResponseBody> openRoomByNfc(@Path("nfcTagId") String nfcTagId);
-    }
+    private SessionManager sessionManager;
+    private NFCViewModel viewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,9 +35,19 @@ public class NFCActivity extends AppCompatActivity {
         Log.d(TAG, "✅ onCreate");
 
         statusText = findViewById(R.id.nfc_status_text);
+        sessionManager = new SessionManager(this);
 
-        if (statusText == null) {
-            Log.e(TAG, "❌ nfc_status_text not found!");
+        // ✅ Створити ViewModel
+        viewModel = new ViewModelProvider(this).get(NFCViewModel.class);
+
+        // ✅ Спостерігати за станом
+        setupObservers();
+
+        // Перевірка авторизації
+        if (!sessionManager.isLoggedIn()) {
+            showStatus("❌ Помилка\n\nСпочатку увійдіть в додаток");
+            finish();
+            return;
         }
 
         // Перевірка NFC
@@ -65,10 +56,9 @@ public class NFCActivity extends AppCompatActivity {
         if (nfcAdapter == null) {
             Log.e(TAG, "❌ NFC not available");
             showStatus("❌ NFC недоступний\n\nЦей пристрій не підтримує NFC");
-            Toast.makeText(this, "NFC не підтримується", Toast.LENGTH_LONG).show();
 
             // Симуляція для емулятора
-            simulateNfcForTesting();
+            simulateVirtualTag();
             return;
         }
 
@@ -78,7 +68,7 @@ public class NFCActivity extends AppCompatActivity {
             Toast.makeText(this, "Увімкніть NFC", Toast.LENGTH_LONG).show();
         } else {
             Log.d(TAG, "✅ NFC ready");
-            showStatus("✅ NFC готовий\n\n📱 Піднесіть телефон до NFC-мітки");
+            showStatus("✅ NFC готовий\n\n📱 Піднесіть телефон до рідера на дверях");
         }
 
         // PendingIntent
@@ -90,6 +80,51 @@ public class NFCActivity extends AppCompatActivity {
                 intent,
                 PendingIntent.FLAG_IMMUTABLE
         );
+    }
+
+    /**
+     * ✅ НОВИЙ: Спостереження за станом відкриття дверей
+     */
+    private void setupObservers() {
+        viewModel.getUnlockState().observe(this, state -> {
+            switch (state.status) {
+                case LOADING:
+                    showStatus("🔄 Завантаження...\n\nПеревіряємо права доступу");
+                    break;
+
+                case SUCCESS:
+                    Log.d(TAG, "✅ Door unlocked: " + state.response.roomName);
+                    showStatus("✅ Двері відкрито!\n\n" +
+                            "🚪 " + state.response.roomName + "\n\n" +
+                            "Можете заходити");
+                    vibrate();
+                    Toast.makeText(this, "Двері відкрито!", Toast.LENGTH_LONG).show();
+
+                    // Закрити екран через 2 сек
+                    statusText.postDelayed(() -> finish(), 2000);
+                    break;
+
+                case DENIED:
+                    Log.w(TAG, "⚠️ Access denied: " + state.message);
+                    showStatus("❌ Доступ заборонено\n\n" + state.message);
+                    vibrate();
+                    Toast.makeText(this, "Доступ заборонено", Toast.LENGTH_LONG).show();
+                    break;
+
+                case OCCUPIED:
+                    Log.w(TAG, "⚠️ Room occupied");
+                    showStatus("⚠️ Аудиторія зайнята\n\nСпробуйте іншу");
+                    vibrate();
+                    Toast.makeText(this, "Аудиторія зайнята", Toast.LENGTH_LONG).show();
+                    break;
+
+                case ERROR:
+                    Log.e(TAG, "❌ Error: " + state.message);
+                    showStatus("❌ Помилка\n\n" + state.message);
+                    Toast.makeText(this, state.message, Toast.LENGTH_LONG).show();
+                    break;
+            }
+        });
     }
 
     @Override
@@ -133,7 +168,7 @@ public class NFCActivity extends AppCompatActivity {
     }
 
     /**
-     * Обробка NFC мітки
+     * ✅ ВИПРАВЛЕНО: Обробка фізичного NFC тегу
      */
     private void handleNfcTag(Intent intent) {
         Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
@@ -144,123 +179,60 @@ public class NFCActivity extends AppCompatActivity {
         }
 
         byte[] tagId = tag.getId();
-        String tagIdHex = bytesToHex(tagId);
+        String tagUid = bytesToHex(tagId);
 
-        Log.d(TAG, "🏷️ NFC Tag read: " + tagIdHex);
+        Log.d(TAG, "🏷️ Фізичний тег зчитано: " + tagUid);
 
-        showStatus("✅ Мітка зчитана!\n\n🏷️ ID: " + tagIdHex + "\n\n🔓 Відкриваємо двері...");
+        showStatus("✅ Тег зчитано!\n\n🏷️ UID: " + tagUid + "\n\n🔓 Відкриваємо двері...");
         vibrate();
 
-        // ✅ ВІДПРАВКА НА СЕРВЕР
-        openDoorViaApi(tagIdHex);
+        // ✅ Використовуємо ViewModel
+        viewModel.unlockDoor(tagUid, null);
     }
 
     /**
-     * ✅ НОВА ЛОГІКА: Відкрити двері через API
+     * ✅ ВИПРАВЛЕНО: Симуляція віртуального тегу
      */
-    private void openDoorViaApi(String nfcTagId) {
-        Log.d(TAG, "🚪 Opening door via API: " + nfcTagId);
+    private void simulateVirtualTag() {
+        Log.w(TAG, "⚠️ Simulation mode: Virtual Tag");
 
-        NfcApi api = RetrofitClient.get().create(NfcApi.class);
+        // Отримати перший тег користувача з SessionManager
+        String virtualTagUid = getFirstUserTag();
 
-        api.openRoomByNfc(nfcTagId).enqueue(new Callback<ResponseBody>() {
-            @Override
-            public void onResponse(@NonNull Call<ResponseBody> call,
-                                   @NonNull Response<ResponseBody> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    try {
-                        String jsonString = response.body().string();
-                        JSONObject json = new JSONObject(jsonString);
-
-                        String status = json.optString("status");
-                        String roomName = json.optString("roomName", "???");
-
-                        if ("OK".equals(status)) {
-                            Log.d(TAG, "✅ Door opened: " + roomName);
-
-                            showStatus("✅ Двері відкрито!\n\n🚪 Аудиторія " + roomName + "\n\nМожете заходити");
-                            Toast.makeText(NFCActivity.this,
-                                    "Двері відкрито!", Toast.LENGTH_LONG).show();
-
-                            // Закрити екран через 2 сек
-                            statusText.postDelayed(() -> {
-                                // ✅ MainActivity автоматично оновиться через LiveData
-                                finish();
-                            }, 2000);
-
-                        } else if ("CONFLICT".equals(status)) {
-                            showStatus("⚠️ Аудиторія вже зайнята\n\nСпробуйте іншу");
-                            Toast.makeText(NFCActivity.this,
-                                    "Аудиторія зайнята", Toast.LENGTH_LONG).show();
-                        }
-
-                    } catch (Exception e) {
-                        Log.e(TAG, "❌ JSON parse error", e);
-                        showErrorStatus("Помилка обробки відповіді");
-                    }
-
-                } else {
-                    Log.w(TAG, "⚠️ API response failed: " + response.code());
-
-                    if (response.code() == 404) {
-                        showStatus("❌ Мітка не зареєстрована\n\nID: " + nfcTagId);
-                        Toast.makeText(NFCActivity.this,
-                                "Невідома NFC мітка", Toast.LENGTH_LONG).show();
-                    } else {
-                        showErrorStatus("Помилка сервера: " + response.code());
-                    }
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<ResponseBody> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ API request failed", t);
-                showErrorStatus("Помилка підключення до сервера");
-
-                // ✅ FALLBACK: Якщо сервер недоступний, працюємо офлайн
-                if (isKnownNfcTag(nfcTagId)) {
-                    showStatus("⚠️ Офлайн режим\n\n🚪 Аудиторія " + getRoomNameByNfc(nfcTagId) + "\n\n(Статус не оновлено)");
-                }
-            }
-        });
-    }
-
-    /**
-     * ✅ СИМУЛЯЦІЯ для емулятора
-     */
-    private void simulateNfcForTesting() {
-        Log.w(TAG, "⚠️ Simulation mode");
-
-        showStatus("⚠️ Режим симуляції\n\n(NFC недоступний)\n\nНатисніть для тесту");
+        showStatus("⚠️ Режим емуляції\n\n" +
+                "📱 Віртуальний тег:\n" + virtualTagUid +
+                "\n\nНатисніть для тесту");
 
         if (statusText != null) {
             statusText.setOnClickListener(v -> {
-                Log.d(TAG, "🧪 Simulating NFC001");
-                showStatus("🧪 Симуляція NFC\n\nID: NFC001\n\n🔓 Відкриваємо...");
+                Log.d(TAG, "🧪 Simulating virtual tag: " + virtualTagUid);
+                showStatus("🧪 Використовую віртуальний тег\n\nUID: " + virtualTagUid + "\n\n🔓 Відкриваємо...");
                 vibrate();
-                openDoorViaApi("NFC001");  // ✅ Викликаємо РЕАЛЬНИЙ API
+
+                // ✅ Використовуємо ViewModel
+                viewModel.unlockDoor(virtualTagUid, "R305");  // Тестова аудиторія 305
             });
         }
     }
 
-    // ========== HELPER МЕТОДИ ==========
+    /**
+     * ✅ НОВИЙ: Отримати перший тег користувача
+     */
+    private String getFirstUserTag() {
+        // Для тестування повертаємо хардкоджений тег
+        // В реальності - завантажити з TagRepository
+        String email = sessionManager.getUserEmail();
 
-    private boolean isKnownNfcTag(String nfcTagId) {
-        return nfcTagId.equals("NFC001") ||
-                nfcTagId.equals("NFC002") ||
-                nfcTagId.equals("NFC003") ||
-                nfcTagId.equals("NFC004");
-    }
-
-    private String getRoomNameByNfc(String nfcTagId) {
-        switch (nfcTagId) {
-            case "NFC001": return "305";
-            case "NFC002": return "306";
-            case "NFC003": return "401";
-            case "NFC004": return "210";
-            default: return "???";
+        if (email != null && email.contains("student")) {
+            return "07:3F:1B:8A:2D:91";  // Студентська картка
+        } else if (email != null && email.contains("professor")) {
+            return "04:5E:2A:B2:4C:80";  // Картка викладача
         }
+
+        return "VT-TEST:00:11:22:33";  // Fallback
     }
+
+    // ========== HELPER МЕТОДИ ==========
 
     private String bytesToHex(byte[] bytes) {
         if (bytes == null || bytes.length == 0) return "";
@@ -268,6 +240,9 @@ public class NFCActivity extends AppCompatActivity {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X", b));
+            if (sb.length() < bytes.length * 3 - 1) {
+                sb.append(":");
+            }
         }
         return sb.toString();
     }
@@ -277,11 +252,6 @@ public class NFCActivity extends AppCompatActivity {
             statusText.setText(message);
         }
         Log.d(TAG, "📝 " + message);
-    }
-
-    private void showErrorStatus(String error) {
-        showStatus("❌ Помилка\n\n" + error);
-        Toast.makeText(this, error, Toast.LENGTH_LONG).show();
     }
 
     private void vibrate() {

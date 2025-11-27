@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">SmartCampus</string>
+
+
+    <string name="google_client_id">579642232057-63b0rc66g2ft0ei4cirii14hq2l1mj49.apps.googleusercontent.com</string>
+
 </resources>
