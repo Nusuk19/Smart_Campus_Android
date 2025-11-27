@@ -1,25 +1,44 @@
 package com.example.smartcampus.client.data.local;
 
+import android.content.Context;
+
 import androidx.room.Database;
+import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-import com.example.smartcampus.client.data.local.dao.RoomDao;
-import com.example.smartcampus.client.data.local.entities.RoomEntity;
+import com.example.smartcampus.client.data.local.dao.*;
+import com.example.smartcampus.client.data.local.entities.*;
 
 /**
- * Room Database для Smart Campus
- *
- * ✅ ВИПРАВЛЕНО: version = 2 (було 1)
- *
- * ВАЖЛИВО:
- * - Кожна зміна структури Entity потребує збільшення версії!
- * - fallbackToDestructiveMigration() видаляє старі дані при оновленні
+ * ✅ ЗМІНЕНО: version = 3
+ * ✅ ДОДАНО: UserEntity, TagEntity
  */
+
 @Database(
-        entities = {RoomEntity.class},
-        version = 2,  // ✅ ЗБІЛЬШЕНО з 1 → 2
+        entities = {RoomEntity.class, UserEntity.class, TagEntity.class},
+        version = 3,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
+
+    private static volatile AppDatabase INSTANCE;
+
     public abstract RoomDao roomDao();
+    public abstract UserDao userDao();
+    public abstract TagDao tagDao();
+
+    public static AppDatabase getInstance(Context context) {
+        if (INSTANCE == null) {
+            synchronized (AppDatabase.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = Room.databaseBuilder(
+                            context.getApplicationContext(),
+                            AppDatabase.class,
+                            "smartcampus"
+                    ).build();
+                }
+            }
+        }
+        return INSTANCE;
+    }
 }

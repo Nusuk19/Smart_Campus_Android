@@ -44,6 +44,20 @@
             </intent-filter>
         </activity>
 
+
+        <activity
+            android:name=".ui.auth.LoginActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ui.auth.RegisterActivity" />
+        <activity android:name=".ui.tags.MyTagsActivity" />
+        <activity android:name=".ui.profile.ProfileActivity" />
+
     </application>
 
 </manifest>
