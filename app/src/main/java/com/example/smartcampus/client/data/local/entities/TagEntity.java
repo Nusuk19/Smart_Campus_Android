@@ -2,23 +2,26 @@ package com.example.smartcampus.client.data.local.entities;
 
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-import com.example.smartcampus.client.utils.VirtualTagGenerator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * NFC тег прив'язаний до користувача
+ * ✅ ВИПРАВЛЕНО: NFC тег з правильною десеріалізацією дат
  *
- * КОНЦЕПЦІЯ:
- * - Один користувач → Багато тегів
- * - Тег може бути PHYSICAL (фізична картка) або VIRTUAL (в телефоні)
+ * ЗМІНИ:
+ * - createdAt та lastUsedAt тепер long (timestamp в мілісекундах)
+ * - Додано @JsonIgnoreProperties для безпеки
+ * - Додано null-перевірки у конструкторі
  */
 @Entity(
         tableName = "tags",
         indices = {@Index(value = "tag_uid", unique = true)}
 )
+@JsonIgnoreProperties(ignoreUnknown = true)  // ✅ Ігноруємо невідомі поля з API
 public class TagEntity {
 
     @PrimaryKey(autoGenerate = true)
@@ -27,35 +30,46 @@ public class TagEntity {
 
     @ColumnInfo(name = "tag_uid")
     @JsonProperty("tagUid")
-    public String tagUid; // Унікальний ID тегу (hex)
+    public String tagUid;
 
     @ColumnInfo(name = "user_id")
     @JsonProperty("userId")
-    public long userId; // Власник тегу
+    public long userId;
 
     @JsonProperty("tagType")
     public String tagType; // PHYSICAL, VIRTUAL
 
     @JsonProperty("name")
-    public String name; // "Моя картка", "Телефон Samsung"
+    public String name;
 
     @ColumnInfo(name = "is_active")
     @JsonProperty("isActive")
     public boolean isActive;
 
+    /**
+     * ✅ ВИПРАВЛЕНО: Використовуємо long замість LocalDateTime
+     * Тепер Jackson правильно десеріалізує timestamp з API
+     */
     @ColumnInfo(name = "created_at")
     @JsonProperty("createdAt")
-    public long createdAt;
+    public long createdAt;  // ✅ long (мілісекунди з 1970)
 
     @ColumnInfo(name = "last_used_at")
     @JsonProperty("lastUsedAt")
-    public long lastUsedAt;
-
-    public TagEntity() {}
+    public long lastUsedAt;  // ✅ long (мілісекунди з 1970)
 
     /**
-     * Стандартний конструктор
+     * ✅ Порожній конструктор (для Room та Jackson)
      */
+    public TagEntity() {
+        this.createdAt = System.currentTimeMillis();
+        this.lastUsedAt = 0;
+    }
+
+    /**
+     * ✅ Конструктор для створення тегу з безпечними значеннями
+     */
+    @Ignore
     public TagEntity(String tagUid, long userId, String tagType, String name) {
         this.tagUid = tagUid != null ? tagUid : "";
         this.userId = userId;
@@ -67,17 +81,18 @@ public class TagEntity {
     }
 
     /**
-     * Конструктор для віртуального тегу (створюється в додатку)
+     * Статичний метод для створення віртуального тегу
      */
     public static TagEntity createVirtualTag(long userId, String name) {
         return new TagEntity(
-                VirtualTagGenerator.generate(), // гарантовано не null
+                com.example.smartcampus.client.utils.VirtualTagGenerator.generate(),
                 userId,
                 "VIRTUAL",
                 name != null ? name : "Віртуальний тег"
         );
     }
 
+    // Utility методи
     public boolean isVirtual() {
         return "VIRTUAL".equals(tagType);
     }
@@ -86,7 +101,6 @@ public class TagEntity {
         return "PHYSICAL".equals(tagType);
     }
 
-    // Безпечні геттери на випадок null
     public String getSafeTagType() {
         return tagType != null ? tagType : "VIRTUAL";
     }
@@ -97,5 +111,18 @@ public class TagEntity {
 
     public String getSafeName() {
         return name != null ? name : "Тег #" + id;
+    }
+
+    /**
+     * ✅ НОВИЙ: Форматувати дату для відображення
+     */
+    public String getFormattedCreatedAt() {
+        if (createdAt == 0) return "Невідомо";
+        return android.text.format.DateFormat.format("dd.MM.yyyy HH:mm", createdAt).toString();
+    }
+
+    public String getFormattedLastUsedAt() {
+        if (lastUsedAt == 0) return "Ніколи";
+        return android.text.format.DateFormat.format("dd.MM.yyyy HH:mm", lastUsedAt).toString();
     }
 }

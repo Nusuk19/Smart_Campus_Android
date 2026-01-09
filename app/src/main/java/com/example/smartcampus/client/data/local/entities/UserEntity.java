@@ -3,15 +3,17 @@ package com.example.smartcampus.client.data.local.entities;
 import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Локальне збереження даних користувача
+ * ✅ ВИПРАВЛЕНО: Додано @JsonIgnoreProperties для ігнорування невідомих полів
  */
 @Entity(
         tableName = "users",
         indices = {@Index(value = "email", unique = true)}
 )
+@JsonIgnoreProperties(ignoreUnknown = true)  // ✅ КРИТИЧНО: Ігноруємо passwordHash з API
 public class UserEntity {
 
     @PrimaryKey

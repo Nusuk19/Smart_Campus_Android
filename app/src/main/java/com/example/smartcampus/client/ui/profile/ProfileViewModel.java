@@ -5,18 +5,18 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.Transformations;
 import com.example.smartcampus.client.data.local.entities.UserEntity;
 import com.example.smartcampus.client.data.repository.UserRepository;
 import com.example.smartcampus.client.utils.SessionManager;
 
 /**
- * 🔄 ВИПРАВЛЕНО: ProfileViewModel
+ * ✅ ВИПРАВЛЕНО: ProfileViewModel з примусовим оновленням з API
  */
 public class ProfileViewModel extends AndroidViewModel {
 
     private final UserRepository repository;
     private final SessionManager sessionManager;
+    private final MutableLiveData<UserEntity> currentUser = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
     private final MutableLiveData<String> successMessage = new MutableLiveData<>();
@@ -25,38 +25,55 @@ public class ProfileViewModel extends AndroidViewModel {
         super(application);
         repository = new UserRepository(application);
         sessionManager = new SessionManager(application);
+
+        // ✅ ВИПРАВЛЕНО: Завантажити профіль відразу
+        loadProfile();
     }
 
     /**
-     * ✅ ВИПРАВЛЕНО: Тепер завантажує дані з API кожного разу
+     * ✅ НОВИЙ: Завантажити профіль з API
      */
-    public LiveData<UserEntity> getCurrentUser() {
-        MutableLiveData<UserEntity> result = new MutableLiveData<>();
+    public void loadProfile() {
+        isLoading.setValue(true);
 
-        // Спочатку показати з кешу (якщо є)
-        long userId = sessionManager.getUserId();
-        LiveData<UserEntity> cached = repository.getCurrentUser();
-
-        // Але обов'язково завантажити з API
         repository.refreshProfile(new UserRepository.UserCallback() {
             @Override
             public void onSuccess(UserEntity user) {
-                result.postValue(user);
+                isLoading.postValue(false);
+                currentUser.postValue(user);
+
+                // Оновити SessionManager
+                sessionManager.saveUser(user.id, user.email, user.name, user.role);
             }
 
             @Override
             public void onError(String error) {
-                // Якщо помилка - показати з кешу
+                isLoading.postValue(false);
                 errorMessage.postValue(error);
-            }
-        });
 
-        return Transformations.switchMap(cached, cachedUser -> {
-            if (result.getValue() == null) {
-                result.setValue(cachedUser);
+                // Fallback: завантажити з кешу
+                loadFromCache();
             }
-            return result;
         });
+    }
+
+    /**
+     * ✅ НОВИЙ: Завантажити з кешу
+     */
+    private void loadFromCache() {
+        long userId = sessionManager.getUserId();
+        repository.getCurrentUser().observeForever(cachedUser -> {
+            if (cachedUser != null) {
+                currentUser.postValue(cachedUser);
+            }
+        });
+    }
+
+    /**
+     * Отримати поточного користувача
+     */
+    public LiveData<UserEntity> getCurrentUser() {
+        return currentUser;
     }
 
     /**
@@ -70,6 +87,7 @@ public class ProfileViewModel extends AndroidViewModel {
             public void onSuccess(UserEntity user) {
                 isLoading.postValue(false);
                 successMessage.postValue("Ім'я оновлено!");
+                currentUser.postValue(user);
 
                 // Оновити в SessionManager
                 sessionManager.saveUser(user.id, user.email, user.name, user.role);

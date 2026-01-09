@@ -9,7 +9,7 @@ import com.example.smartcampus.client.data.remote.api.AuthResponse;
 import com.example.smartcampus.client.data.repository.AuthRepository;
 
 /**
- * 🆕 ViewModel для автентифікації
+ * 🔄 ОНОВЛЕНО: ViewModel з підтримкою ролі
  */
 public class AuthViewModel extends AndroidViewModel {
 
@@ -61,12 +61,12 @@ public class AuthViewModel extends AndroidViewModel {
     }
 
     /**
-     * Реєстрація
+     * ✅ ОНОВЛЕНО: Реєстрація з роллю
      */
-    public void register(String email, String password, String name) {
+    public void register(String email, String password, String name, String role) {
         registerState.setValue(AuthState.loading());
 
-        repository.register(email, password, name, new AuthRepository.AuthCallback() {
+        repository.register(email, password, name, role, new AuthRepository.AuthCallback() {
             @Override
             public void onSuccess(AuthResponse.UserData user) {
                 registerState.postValue(AuthState.success(user));
