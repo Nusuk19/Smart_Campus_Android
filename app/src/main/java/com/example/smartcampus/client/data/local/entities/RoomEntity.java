@@ -6,10 +6,11 @@ import androidx.room.Ignore;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Entity для локального збереження даних про аудиторії
+ * ✅ ВИПРАВЛЕНО: Додано @JsonIgnoreProperties + підтримка нових полів
  */
 @Entity(
         tableName = "rooms",
@@ -18,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
                 @Index(value = "nfc_tag_id", unique = true)
         }
 )
+@JsonIgnoreProperties(ignoreUnknown = true)  // ✅ КРИТИЧНО: Ігноруємо lockId, occupiedBy, etc.
 public class RoomEntity {
 
     @PrimaryKey
@@ -54,6 +56,19 @@ public class RoomEntity {
 
     @ColumnInfo(name = "last_updated")
     public long lastUpdated;
+
+    // ✅ НОВИЙ: Додано поля з API (але НЕ зберігаємо в БД)
+    @Ignore
+    @JsonProperty("nfcReaderId")
+    public String nfcReaderId;
+
+    @Ignore
+    @JsonProperty("lockId")
+    public String lockId;
+
+    @Ignore
+    @JsonProperty("occupiedBy")
+    public Long occupiedBy;
 
     /**
      * ✅ Порожній конструктор (для Room та Jackson)

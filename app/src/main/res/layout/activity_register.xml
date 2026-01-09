@@ -104,6 +104,47 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- ✅ НОВИЙ: Role Selection -->
+        <TextView
+            android:id="@+id/role_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Оберіть роль:"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            app:layout_constraintTop_toBottomOf="@id/confirm_password_input_layout"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <RadioGroup
+            android:id="@+id/role_radio_group"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            app:layout_constraintTop_toBottomOf="@id/role_label"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <RadioButton
+                android:id="@+id/student_radio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👨‍🎓 Студент"
+                android:textSize="16sp"
+                android:checked="true"/>
+
+            <RadioButton
+                android:id="@+id/professor_radio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👨‍🏫 Викладач"
+                android:textSize="16sp"
+                android:layout_marginTop="8dp"/>
+
+        </RadioGroup>
+
         <!-- Error Text -->
         <TextView
             android:id="@+id/error_text"
@@ -113,7 +154,7 @@
             android:textColor="@android:color/holo_red_dark"
             android:textSize="14sp"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/confirm_password_input_layout"
+            app:layout_constraintTop_toBottomOf="@id/role_radio_group"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"/>
 

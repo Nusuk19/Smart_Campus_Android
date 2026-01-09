@@ -10,7 +10,7 @@ import com.example.smartcampus.client.R;
 import com.example.smartcampus.client.ui.main.MainActivity;
 
 /**
- * 🆕 Екран реєстрації нового користувача
+ * 🔄 ОНОВЛЕНО: Екран реєстрації з вибором ролі
  */
 public class RegisterActivity extends AppCompatActivity {
 
@@ -21,6 +21,9 @@ public class RegisterActivity extends AppCompatActivity {
     private EditText emailInput;
     private EditText passwordInput;
     private EditText confirmPasswordInput;
+    private RadioGroup roleRadioGroup;
+    private RadioButton studentRadio;
+    private RadioButton professorRadio;
     private Button registerButton;
     private Button loginButton;
     private ProgressBar progressBar;
@@ -41,6 +44,9 @@ public class RegisterActivity extends AppCompatActivity {
         emailInput = findViewById(R.id.email_input);
         passwordInput = findViewById(R.id.password_input);
         confirmPasswordInput = findViewById(R.id.confirm_password_input);
+        roleRadioGroup = findViewById(R.id.role_radio_group);
+        studentRadio = findViewById(R.id.student_radio);
+        professorRadio = findViewById(R.id.professor_radio);
         registerButton = findViewById(R.id.register_button);
         loginButton = findViewById(R.id.login_button);
         progressBar = findViewById(R.id.progress_bar);
@@ -110,8 +116,17 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
 
-        // Реєстрація
-        viewModel.register(email, password, name);
+        // ✅ НОВИЙ: Отримати вибрану роль
+        int selectedRoleId = roleRadioGroup.getCheckedRadioButtonId();
+        if (selectedRoleId == -1) {
+            Toast.makeText(this, "Оберіть роль", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String role = selectedRoleId == R.id.student_radio ? "STUDENT" : "PROFESSOR";
+
+        // Реєстрація з роллю
+        viewModel.register(email, password, name, role);
     }
 
     private void goToMainActivity() {
@@ -122,7 +137,7 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void goToLoginActivity() {
-        finish(); // Повернутись до LoginActivity
+        finish();
     }
 
     private void showLoading() {

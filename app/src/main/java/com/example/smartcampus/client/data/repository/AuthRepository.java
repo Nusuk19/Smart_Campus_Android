@@ -17,7 +17,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
- * Repository для автентифікації
+ * 🔄 ОНОВЛЕНО: Repository з підтримкою ролі
  */
 public class AuthRepository {
 
@@ -35,11 +35,11 @@ public class AuthRepository {
     }
 
     /**
-     * Реєстрація
+     * ✅ ОНОВЛЕНО: Реєстрація з роллю
      */
-    public void register(String email, String password, String name,
+    public void register(String email, String password, String name, String role,
                          AuthCallback callback) {
-        RegisterRequest request = new RegisterRequest(email, password, name);
+        RegisterRequest request = new RegisterRequest(email, password, name, role);
 
         api.register(request).enqueue(new Callback<AuthResponse>() {
             @Override
@@ -144,6 +144,14 @@ public class AuthRepository {
             user.photoUrl = response.user.photoUrl;
             userDao.insert(user);
         });
+
+        // Зберегти в SessionManager
+        sessionManager.saveUser(
+                response.user.id,
+                response.user.email,
+                response.user.name,
+                response.user.role
+        );
 
         callback.onSuccess(response.user);
     }

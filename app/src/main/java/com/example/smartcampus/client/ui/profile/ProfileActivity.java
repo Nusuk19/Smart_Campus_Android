@@ -2,6 +2,7 @@ package com.example.smartcampus.client.ui.profile;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
@@ -15,9 +16,11 @@ import com.example.smartcampus.client.ui.tags.MyTagsActivity;
 import com.example.smartcampus.client.utils.SessionManager;
 
 /**
- * 🆕 Екран профілю користувача
+ * ✅ ВИПРАВЛЕНО: ProfileActivity з правильним завантаженням
  */
 public class ProfileActivity extends AppCompatActivity {
+
+    private static final String TAG = "ProfileActivity";
 
     private ProfileViewModel viewModel;
     private AuthViewModel authViewModel;
@@ -39,6 +42,8 @@ public class ProfileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile);
 
+        Log.d(TAG, "✅ onCreate started");
+
         initViews();
         setupViewModels();
         setupObservers();
@@ -55,27 +60,42 @@ public class ProfileActivity extends AppCompatActivity {
         myTagsButton = findViewById(R.id.my_tags_button);
         logoutButton = findViewById(R.id.logout_button);
         progressBar = findViewById(R.id.progress_bar);
+
+        Log.d(TAG, "✅ Views initialized");
     }
 
     private void setupViewModels() {
         viewModel = new ViewModelProvider(this).get(ProfileViewModel.class);
         authViewModel = new ViewModelProvider(this).get(AuthViewModel.class);
         sessionManager = new SessionManager(this);
+
+        Log.d(TAG, "✅ ViewModels created");
     }
 
     private void setupObservers() {
-        // Завантажити профіль
-        viewModel.getCurrentUser().observe(this, this::displayUser);
+        // ✅ ВИПРАВЛЕНО: Правильний observer
+        viewModel.getCurrentUser().observe(this, user -> {
+            Log.d(TAG, "📊 User data received: " + (user != null ? user.email : "null"));
+
+            if (user != null) {
+                displayUser(user);
+            } else {
+                Log.w(TAG, "⚠️ User is null, loading profile...");
+                viewModel.loadProfile();
+            }
+        });
 
         // Loading state
         viewModel.getLoadingState().observe(this, isLoading -> {
             progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            Log.d(TAG, isLoading ? "⏳ Loading..." : "✅ Loading complete");
         });
 
         // Success messages
         viewModel.getSuccessMessage().observe(this, message -> {
             if (message != null && !message.isEmpty()) {
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "✅ Success: " + message);
             }
         });
 
@@ -83,8 +103,11 @@ public class ProfileActivity extends AppCompatActivity {
         viewModel.getErrorMessage().observe(this, message -> {
             if (message != null && !message.isEmpty()) {
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                Log.e(TAG, "❌ Error: " + message);
             }
         });
+
+        Log.d(TAG, "✅ Observers configured");
     }
 
     private void setupListeners() {
@@ -98,7 +121,7 @@ public class ProfileActivity extends AppCompatActivity {
      * Відобразити дані користувача
      */
     private void displayUser(UserEntity user) {
-        if (user == null) return;
+        Log.d(TAG, "🖼️ Displaying user: " + user.email);
 
         nameText.setText(user.name);
         emailText.setText(user.email);
@@ -140,6 +163,7 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setPositiveButton("Зберегти", (dialog, which) -> {
             String newName = input.getText().toString().trim();
             if (!newName.isEmpty()) {
+                Log.d(TAG, "✏️ Updating name to: " + newName);
                 viewModel.updateName(newName);
             }
         });
@@ -189,6 +213,7 @@ public class ProfileActivity extends AppCompatActivity {
                 return;
             }
 
+            Log.d(TAG, "🔐 Changing password");
             viewModel.changePassword(oldPassword, newPassword);
         });
 
@@ -212,6 +237,7 @@ public class ProfileActivity extends AppCompatActivity {
                 .setTitle("Вийти з акаунту?")
                 .setMessage("Ви впевнені що хочете вийти?")
                 .setPositiveButton("Вийти", (dialog, which) -> {
+                    Log.d(TAG, "🚪 Logging out");
                     authViewModel.logout();
 
                     // Перейти до LoginActivity
@@ -222,5 +248,14 @@ public class ProfileActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Скасувати", null)
                 .show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "▶️ onResume - Refreshing profile");
+
+        // ✅ ВИПРАВЛЕНО: Оновити профіль при поверненні на екран
+        viewModel.loadProfile();
     }
 }

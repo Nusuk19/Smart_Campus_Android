@@ -1,6 +1,7 @@
 package com.example.smartcampus.client.ui.tags;
 
 import android.app.Application;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
@@ -10,12 +11,14 @@ import com.example.smartcampus.client.data.repository.TagRepository;
 import java.util.List;
 
 /**
- * 🆕 ViewModel для управління NFC тегами
+ * ✅ ВИПРАВЛЕНО: ViewModel з примусовим завантаженням
  */
 public class TagViewModel extends AndroidViewModel {
 
+    private static final String TAG = "TagViewModel";
+
     private final TagRepository repository;
-    private final LiveData<List<TagEntity>> tags;
+    private final MutableLiveData<List<TagEntity>> tags = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
     private final MutableLiveData<String> successMessage = new MutableLiveData<>();
@@ -23,7 +26,25 @@ public class TagViewModel extends AndroidViewModel {
     public TagViewModel(@NonNull Application application) {
         super(application);
         repository = new TagRepository(application);
-        tags = repository.getMyTags();
+
+        // ✅ ВИПРАВЛЕНО: Завантажити теги відразу
+        loadTags();
+    }
+
+    /**
+     * ✅ НОВИЙ: Завантажити теги з API
+     */
+    public void loadTags() {
+        Log.d(TAG, "🔄 Loading tags from API...");
+        isLoading.setValue(true);
+
+        // Спостерігаємо за змінами в БД
+        LiveData<List<TagEntity>> tagsLiveData = repository.getMyTags();
+        tagsLiveData.observeForever(tagList -> {
+            Log.d(TAG, "📊 Tags updated: " + (tagList != null ? tagList.size() : 0));
+            tags.postValue(tagList);
+            isLoading.postValue(false);
+        });
     }
 
     /**
@@ -37,6 +58,7 @@ public class TagViewModel extends AndroidViewModel {
      * Створити віртуальний тег
      */
     public void createVirtualTag(String name) {
+        Log.d(TAG, "🏷️ Creating virtual tag: " + name);
         isLoading.setValue(true);
 
         repository.createVirtualTag(name, new TagRepository.TagCallback() {
@@ -44,12 +66,17 @@ public class TagViewModel extends AndroidViewModel {
             public void onSuccess(TagEntity tag) {
                 isLoading.postValue(false);
                 successMessage.postValue("Тег '" + tag.name + "' створено!");
+                Log.d(TAG, "✅ Tag created: " + tag.id);
+
+                // ✅ ВИПРАВЛЕНО: Оновити список
+                loadTags();
             }
 
             @Override
             public void onError(String error) {
                 isLoading.postValue(false);
                 errorMessage.postValue(error);
+                Log.e(TAG, "❌ Failed to create tag: " + error);
             }
         });
     }
@@ -58,6 +85,7 @@ public class TagViewModel extends AndroidViewModel {
      * Видалити тег
      */
     public void deleteTag(long tagId) {
+        Log.d(TAG, "🗑️ Deleting tag: " + tagId);
         isLoading.setValue(true);
 
         repository.deleteTag(tagId, new TagRepository.TagCallback() {
@@ -65,12 +93,17 @@ public class TagViewModel extends AndroidViewModel {
             public void onSuccess(TagEntity tag) {
                 isLoading.postValue(false);
                 successMessage.postValue("Тег видалено");
+                Log.d(TAG, "✅ Tag deleted");
+
+                // ✅ ВИПРАВЛЕНО: Оновити список
+                loadTags();
             }
 
             @Override
             public void onError(String error) {
                 isLoading.postValue(false);
                 errorMessage.postValue(error);
+                Log.e(TAG, "❌ Failed to delete tag: " + error);
             }
         });
     }
@@ -79,6 +112,7 @@ public class TagViewModel extends AndroidViewModel {
      * Перейменувати тег
      */
     public void renameTag(long tagId, String newName) {
+        Log.d(TAG, "✏️ Renaming tag " + tagId + " to: " + newName);
         isLoading.setValue(true);
 
         repository.renameTag(tagId, newName, new TagRepository.TagCallback() {
@@ -86,12 +120,17 @@ public class TagViewModel extends AndroidViewModel {
             public void onSuccess(TagEntity tag) {
                 isLoading.postValue(false);
                 successMessage.postValue("Тег перейменовано");
+                Log.d(TAG, "✅ Tag renamed");
+
+                // ✅ ВИПРАВЛЕНО: Оновити список
+                loadTags();
             }
 
             @Override
             public void onError(String error) {
                 isLoading.postValue(false);
                 errorMessage.postValue(error);
+                Log.e(TAG, "❌ Failed to rename tag: " + error);
             }
         });
     }
